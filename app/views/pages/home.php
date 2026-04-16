@@ -1,4 +1,5 @@
 <!-- Hero Recipe Card -->
+
 <section class="relative mb-6">
     <img
         class="w-full h-96 object-cover"
@@ -14,7 +15,7 @@
             <span class="text-white">4.9</span>
         </div>
         <p class="text-gray-300 mb-4">
-            <?php echo $randomRecipe['description']; ?>
+            <?php echo \Core\Helpers\truncate($randomRecipe['description'], 200); ?>
         </p>
         <div class="flex items-center mb-4">
             <span class="text-gray-400 mr-2">Par Jean Dupont</span>
