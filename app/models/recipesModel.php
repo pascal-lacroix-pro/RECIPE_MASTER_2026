@@ -23,3 +23,16 @@ function findAllPopulars(PDO $conn)
     $rs = $conn->query($sql);
     return $rs->fetchAll(PDO::FETCH_ASSOC);
 }
+
+function findAllByUserId(PDO $conn, int $userID)
+{
+    $sql = "SELECT *
+            FROM recipes
+            WHERE user_id = :userID
+            ORDER BY created_at DESC
+            LIMIT 3;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':userID', $userID, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
