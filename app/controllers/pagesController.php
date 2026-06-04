@@ -12,8 +12,8 @@ function homeAction(PDO $conn)
     include_once '../app/models/usersModel.php';
     $randomRecipe = RecipesModel\findOneByRand($conn);
     $recipes = RecipesModel\findAllPopulars($conn);
-    $randomUser = UsersModel\findOneByRand($conn);
-    $userLatestRecipes = RecipesModel\findAllByUserId($conn, $randomUser['id']);
+    $user = UsersModel\findOneByRand($conn);
+    $userLatestRecipes = RecipesModel\findAllByUserId($conn, $user['id']);
 
     global $title, $content;
     $title = "Home";
