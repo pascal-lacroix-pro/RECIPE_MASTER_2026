@@ -9,6 +9,11 @@ if (isset($_GET['recipes'])):
 elseif (isset($_GET['users'])):
     include_once '../app/routers/users.php';
 
+// Si on a un ?categories=xxx
+// On charge le router ./app/routers/categories.php
+elseif (isset($_GET['categories'])):
+    include_once '../app/routers/categories.php';
+
 // ROUTE PAR DÉFAUT
 // PATTERN: /
 // CTRL: pagesController (composite)

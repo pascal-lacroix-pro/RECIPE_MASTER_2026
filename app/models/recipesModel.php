@@ -49,6 +49,18 @@ function findAllByUserId(PDO $conn, int $userID)
     return $rs->fetchAll(PDO::FETCH_ASSOC);
 }
 
+function findAllByTypeId(PDO $conn, int $typeId)
+{
+    $sql = "SELECT *
+            FROM recipes
+            WHERE type_id = :typeId
+            ORDER BY created_at DESC;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':typeId', $typeId, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
 function findOneById(PDO $conn, int $id)
 {
     $sql = "SELECT *
