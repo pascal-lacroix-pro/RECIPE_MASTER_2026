@@ -6,7 +6,7 @@
                 <div class="flex items-center">
                     <a
                         class="text-white font-bold text-xl flex items-center"
-                        href="index.html">
+                        href="?">
                         <i class="fas fa-utensils text-yellow-500 mr-2"></i> RECIPE
                         MASTER
                     </a>
@@ -39,7 +39,7 @@
                         class="p-2 rounded-md" />
                     <a
                         class="text-white hover:text-yellow-500 px-3 py-2"
-                        href="recipes.html">Recettes</a>
+                        href="?recipes=index">Recettes</a>
                     <a
                         class="text-white hover:text-yellow-500 px-3 py-2"
                         href="chefs.html">Chefs</a>

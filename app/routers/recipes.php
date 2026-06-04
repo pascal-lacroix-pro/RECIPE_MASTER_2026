@@ -9,5 +9,6 @@ switch ($_GET['recipes']):
         RecipesController\showAction($conn, $_GET['id']);
         break;
     default:
+        RecipesController\indexAction($conn);
         break;
 endswitch;

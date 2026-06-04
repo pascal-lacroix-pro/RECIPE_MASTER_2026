@@ -11,7 +11,7 @@ function homeAction(PDO $conn)
     include_once '../app/models/recipesModel.php';
     include_once '../app/models/usersModel.php';
     $randomRecipe = RecipesModel\findOneByRand($conn);
-    $popularRecipes = RecipesModel\findAllPopulars($conn);
+    $recipes = RecipesModel\findAllPopulars($conn);
     $randomUser = UsersModel\findOneByRand($conn);
     $userLatestRecipes = RecipesModel\findAllByUserId($conn, $randomUser['id']);
 
