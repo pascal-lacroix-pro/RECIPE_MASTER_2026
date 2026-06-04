@@ -61,6 +61,19 @@ function findAllByTypeId(PDO $conn, int $typeId)
     return $rs->fetchAll(PDO::FETCH_ASSOC);
 }
 
+function findAllByIngredientId(PDO $conn, int $ingredientId)
+{
+    $sql = "SELECT recipes.*
+            FROM recipes
+            JOIN recipes_has_ingredients ON recipes.id = recipes_has_ingredients.recipe_id
+            WHERE recipes_has_ingredients.ingredient_id = :ingredientId
+            ORDER BY recipes.created_at DESC;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':ingredientId', $ingredientId, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
 function findOneById(PDO $conn, int $id)
 {
     $sql = "SELECT *
