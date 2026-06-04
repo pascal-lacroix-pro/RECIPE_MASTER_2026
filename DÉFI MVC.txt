@@ -1,10 +1,11 @@
 DÉFI MVC: RECIPE MASTER
 
 MUST
-	1. Route users.index depuis le lien du menu
-	2. Route users.show depuis les liens vers les users
-	3. Route categories.show quand on clique sur une catégorie
-	4. Route ingredients.show quand on clique sur un ingrédient
+	1. Route recipes.index depuis le lien du menu
+	2. Route users.index depuis le lien du menu
+	3. Route users.show depuis les liens vers les users
+	4. Route categories.show quand on clique sur une catégorie
+	5. Route ingredients.show quand on clique sur un ingrédient
 
 SHOULD
 	1. Route recipes.search: recherche full-text sur titre et desc des recipes

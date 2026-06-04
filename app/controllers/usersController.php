@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Controllers\UsersController;
+
+use \PDO;
+use \App\Models\UsersModel;
+
+function indexAction(PDO $conn, int $limit = 9)
+{
+    include_once '../app/models/usersModel.php';
+    $users = UsersModel\findAll($conn, $limit);
+
+    global $content, $title;
+    $title = USERS_INDEX_TITLE;
+    ob_start();
+    include '../app/views/users/index.php';
+    $content = ob_get_clean();
+}
+
+// function showAction(PDO $conn, int $id)
+// {
+//     include_once '../app/models/usersModel.php';
+//     $recipe = UsersModel\findOneById($conn, $id);
+// 
+//     global $content, $title;
+//     $title = $user['name'];
+//     ob_start();
+//     include '../app/views/users/show.php';
+//     $content = ob_get_clean();
+// }

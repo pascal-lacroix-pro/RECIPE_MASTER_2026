@@ -2,7 +2,7 @@
 
 use \App\Controllers\RecipesController;
 
-include '../app/controllers/recipesController.php';
+include_once '../app/controllers/recipesController.php';
 
 switch ($_GET['recipes']):
     case 'show':

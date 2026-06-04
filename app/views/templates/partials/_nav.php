@@ -42,7 +42,7 @@
                         href="?recipes=index">Recettes</a>
                     <a
                         class="text-white hover:text-yellow-500 px-3 py-2"
-                        href="chefs.html">Chefs</a>
+                        href="?users=index">Chefs</a>
                 </div>
             </div>
         </div>
@@ -52,7 +52,7 @@
                 placeholder="Rechercher une recette..."
                 class="p-2 w-full" />
             <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#">Recettes</a>
-            <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#">Chefs</a>
+            <a class="block text-white hover:text-yellow-500 px-3 py-2" href="?users=index">Chefs</a>
         </div>
     </nav>
 </div>
