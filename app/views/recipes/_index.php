@@ -10,10 +10,10 @@
             class="bg-white rounded-lg overflow-hidden shadow-lg relative">
             <img
                 class="w-full h-48 object-cover"
-                src="<?php echo $recipe['picture']; ?>"
-                alt="<?php echo $recipe['name']; ?>" />
+                src="<?php echo htmlspecialchars($recipe['picture']); ?>"
+                alt="<?php echo htmlspecialchars($recipe['name']); ?>" />
             <div class="p-4">
-                <h3 class="text-xl font-bold mb-2"><?php echo $recipe['name']; ?></h3>
+                <h3 class="text-xl font-bold mb-2"><?php echo htmlspecialchars($recipe['name']); ?></h3>
                 <div class="flex items-center mb-2">
                     <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
                     <span><?php echo number_format($recipe['avg_rating'], 1); ?></span>

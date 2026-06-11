@@ -12,6 +12,10 @@ function showAction(PDO $conn, int $id)
     include_once '../app/models/recipesModel.php';
 
     $category = CategoriesModel\findOneById($conn, $id);
+    if (!$category) {
+        header('Location: ?');
+        exit;
+    }
     $recipes = RecipesModel\findAllByTypeId($conn, $category['id']);
 
     global $content, $title;

@@ -1,14 +1,17 @@
 <?php
 
-/**  @var array $recipe [id, name, ...]*/
+/**
+ * @var array $recipe   [id, name, avg_rating, comments_count, ...]
+ * @var array $comments [id, content, created_at, user_id, ...]
+ */
 ?>
 <section class="bg-white rounded-lg shadow-lg p-6 mb-6">
     <!-- Recipe Image -->
-    <img class="w-full h-96 object-cover rounded-t-lg" src="<?php echo $recipe['picture'];  ?>" alt="<?php echo $recipe['name'];  ?>">
+    <img class="w-full h-96 object-cover rounded-t-lg" src="<?php echo htmlspecialchars($recipe['picture']); ?>" alt="<?php echo htmlspecialchars($recipe['name']); ?>">
 
     <!-- Recipe Info -->
     <div class="p-4">
-        <h1 class="text-3xl font-bold mb-4"><?php echo $recipe['name'];  ?></h1>
+        <h1 class="text-3xl font-bold mb-4"><?php echo htmlspecialchars($recipe['name']); ?></h1>
         <div class="flex items-center mb-4">
             <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
             <span><?php echo number_format($recipe['avg_rating'], 1); ?></span>

@@ -7,13 +7,13 @@
     <div class="flex items-center mb-6">
         <!-- User Avatar -->
         <img
-            src="pictures/<?php echo $user['picture']; ?>"
-            alt="<?php echo $user['name']; ?>"
+            src="pictures/<?php echo htmlspecialchars($user['picture']); ?>"
+            alt="<?php echo htmlspecialchars($user['name']); ?>"
             class="w-24 h-24 rounded-full border-4 border-yellow-500 mr-4" />
 
         <!-- User Details -->
         <div>
-            <h3 class="text-2xl font-bold"><?php echo $user['name']; ?></h3>
+            <h3 class="text-2xl font-bold"><?php echo htmlspecialchars($user['name']); ?></h3>
             <p class="text-gray-400">Membre depuis: <?php echo $user['created_at']; ?></p>
             <p class="text-gray-400">Nombre de recettes postées: 10</p>
         </div>

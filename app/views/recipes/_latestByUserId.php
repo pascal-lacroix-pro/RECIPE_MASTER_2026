@@ -13,12 +13,12 @@
             <article
                 class="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative">
                 <img
-                    src="<?php echo $recipe['picture']; ?>"
-                    alt="<?php echo $recipe['name']; ?>"
+                    src="<?php echo htmlspecialchars($recipe['picture']); ?>"
+                    alt="<?php echo htmlspecialchars($recipe['name']); ?>"
                     class="w-full h-48 object-cover" />
                 <div class="p-4">
                     <h5 class="text-lg font-bold mb-2">
-                        <?php echo $recipe['name']; ?>
+                        <?php echo htmlspecialchars($recipe['name']); ?>
                     </h5>
                     <div class="flex items-center mb-2">
                         <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>

@@ -24,6 +24,10 @@ function showAction(PDO $conn, int $id)
     include_once '../app/models/recipesModel.php';
 
     $user = UsersModel\findOneById($conn, $id);
+    if (!$user) {
+        header('Location: ?users');
+        exit;
+    }
     $userLatestRecipes = RecipesModel\findAllByUserId($conn, $user['id']);
 
     global $content, $title;

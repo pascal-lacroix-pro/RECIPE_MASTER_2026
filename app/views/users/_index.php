@@ -10,10 +10,10 @@
             class="bg-white rounded-lg overflow-hidden shadow-lg relative">
             <img
                 class="w-full h-48 object-cover"
-                src="pictures/<?php echo $user['picture']; ?>"
-                alt="<?php echo $user['name']; ?>" />
+                src="pictures/<?php echo htmlspecialchars($user['picture']); ?>"
+                alt="<?php echo htmlspecialchars($user['name']); ?>" />
             <div class="p-4">
-                <h3 class="text-xl font-bold mb-2"><?php echo $user['name']; ?></h3>
+                <h3 class="text-xl font-bold mb-2"><?php echo htmlspecialchars($user['name']); ?></h3>
                 <div class="flex items-center mb-2">
                     <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
                     <span>4.5</span>

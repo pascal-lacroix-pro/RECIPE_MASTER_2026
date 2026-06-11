@@ -4,6 +4,7 @@ Un projet basé sur une architecture MVC procédurale.
 ## Installation
 * Lancez votre serveur web (Mamp/Wamp ou Xamp ...)
 * Chargez la db_remplie sur votre serveur mySQL
+* Importez ensuite ./documents/db/v_recipes.sql pour créer la VIEW requise
 * Placez le dossier complet dans le dossier racine de votre serveur web (htdocs, www, ...)
 * Renommez ./app/config/params_example.php en ./app/config/params.php
 * Modifier les données dans ./app/config/params.php

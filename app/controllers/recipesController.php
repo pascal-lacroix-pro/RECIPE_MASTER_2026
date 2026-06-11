@@ -4,13 +4,15 @@ namespace App\Controllers\RecipesController;
 
 use \PDO;
 use \App\Models\RecipesModel;
+use \App\Models\CommentsModel;
 
 function indexAction(PDO $conn, int $page = 1, int $limit = 9)
 {
     include_once '../app/models/recipesModel.php';
+    $totalPages = max(1, (int)ceil(RecipesModel\countAll($conn) / $limit));
+    $page = max(1, min($page, $totalPages));
     $offset = ($page - 1) * $limit;
     $recipes = RecipesModel\findAll($conn, $limit, $offset);
-    $totalPages = (int)ceil(RecipesModel\countAll($conn) / $limit);
 
     global $content, $title;
     $title = RECIPES_INDEX_TITLE;
@@ -44,7 +46,11 @@ function showAction(PDO $conn, int $id)
     include_once '../app/models/recipesModel.php';
     include_once '../app/models/commentsModel.php';
     $recipe = RecipesModel\findOneById($conn, $id);
-    $comments = \App\Models\CommentsModel\findAllByRecipeId($conn, $recipe['id']);
+    if (!$recipe) {
+        header('Location: ?recipes');
+        exit;
+    }
+    $comments = CommentsModel\findAllByRecipeId($conn, $recipe['id']);
 
     global $content, $title;
     $title = $recipe['name'];

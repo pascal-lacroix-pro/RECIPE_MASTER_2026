@@ -44,15 +44,15 @@ function findAllPopulars(PDO $conn)
     return $rs->fetchAll(PDO::FETCH_ASSOC);
 }
 
-function findAllByUserId(PDO $conn, int $userID)
+function findAllByUserId(PDO $conn, int $userId)
 {
     $sql = "SELECT *
             FROM v_recipes
-            WHERE user_id = :userID
+            WHERE user_id = :userId
             ORDER BY created_at DESC
             LIMIT 3;";
     $rs = $conn->prepare($sql);
-    $rs->bindValue(':userID', $userID, PDO::PARAM_INT);
+    $rs->bindValue(':userId', $userId, PDO::PARAM_INT);
     $rs->execute();
     return $rs->fetchAll(PDO::FETCH_ASSOC);
 }
