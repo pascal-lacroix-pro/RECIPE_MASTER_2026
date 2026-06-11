@@ -14,14 +14,22 @@ function findOneByRand(PDO $conn): array
     return $rs->fetch(PDO::FETCH_ASSOC);
 }
 
-function findAll(PDO $conn, int $limit = 9)
+function countAll(PDO $conn): int
+{
+    $rs = $conn->query("SELECT COUNT(*) FROM recipes;");
+    return (int)$rs->fetchColumn();
+}
+
+function findAll(PDO $conn, int $limit = 9, int $offset = 0)
 {
     $sql = "SELECT *
             FROM v_recipes
             ORDER BY created_at DESC
-            LIMIT :limit;";
+            LIMIT :limit
+            OFFSET :offset;";
     $rs = $conn->prepare($sql);
     $rs->bindValue(":limit", $limit, PDO::PARAM_INT);
+    $rs->bindValue(":offset", $offset, PDO::PARAM_INT);
     $rs->execute();
     return $rs->fetchAll(PDO::FETCH_ASSOC);
 }

@@ -12,6 +12,6 @@ switch ($_GET['recipes']):
         RecipesController\searchAction($conn, $_GET['q'] ?? '');
         break;
     default:
-        RecipesController\indexAction($conn);
+        RecipesController\indexAction($conn, (int)($_GET['page'] ?? 1));
         break;
 endswitch;
