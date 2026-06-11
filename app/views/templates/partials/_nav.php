@@ -33,10 +33,17 @@
                     </button>
                 </div>
                 <div class="hidden md:flex items-center space-x-4">
-                    <input
-                        type="text"
-                        placeholder="Rechercher une recette..."
-                        class="p-2 rounded-md" />
+                    <form method="get" action="">
+                        <input
+                            type="hidden"
+                            name="recipes"
+                            value="search" />
+                        <input
+                            type="text"
+                            name="q"
+                            placeholder="Rechercher une recette..."
+                            class="p-2 rounded-md" />
+                    </form>
                     <a
                         class="text-white hover:text-yellow-500 px-3 py-2"
                         href="?recipes=index">Recettes</a>
@@ -47,10 +54,17 @@
             </div>
         </div>
         <div x-show="open" class="md:hidden bg-gray-700">
-            <input
-                type="text"
-                placeholder="Rechercher une recette..."
-                class="p-2 w-full" />
+            <form method="get" action="">
+                <input
+                    type="hidden"
+                    name="recipes"
+                    value="search" />
+                <input
+                    type="text"
+                    name="q"
+                    placeholder="Rechercher une recette..."
+                    class="p-2 w-full" />
+            </form>
             <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#">Recettes</a>
             <a class="block text-white hover:text-yellow-500 px-3 py-2" href="?users=index">Chefs</a>
         </div>

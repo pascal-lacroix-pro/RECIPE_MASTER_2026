@@ -17,6 +17,18 @@ function indexAction(PDO $conn, int $limit = 9)
     $content = ob_get_clean();
 }
 
+function searchAction(PDO $conn, string $query)
+{
+    include_once '../app/models/recipesModel.php';
+    $recipes = RecipesModel\search($conn, $query);
+
+    global $content, $title;
+    $title = "Recherche : " . htmlspecialchars($query);
+    ob_start();
+    include '../app/views/recipes/search.php';
+    $content = ob_get_clean();
+}
+
 function showAction(PDO $conn, int $id)
 {
     include_once '../app/models/recipesModel.php';

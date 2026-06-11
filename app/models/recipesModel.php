@@ -74,6 +74,19 @@ function findAllByIngredientId(PDO $conn, int $ingredientId)
     return $rs->fetchAll(PDO::FETCH_ASSOC);
 }
 
+function search(PDO $conn, string $query)
+{
+    $sql = "SELECT *
+            FROM recipes
+            WHERE name LIKE :query
+               OR description LIKE :query
+            ORDER BY created_at DESC;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':query', '%' . $query . '%', PDO::PARAM_STR);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
 function findOneById(PDO $conn, int $id)
 {
     $sql = "SELECT *
