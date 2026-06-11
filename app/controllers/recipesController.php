@@ -20,7 +20,15 @@ function indexAction(PDO $conn, int $limit = 9)
 function searchAction(PDO $conn, string $query)
 {
     include_once '../app/models/recipesModel.php';
-    $recipes = RecipesModel\search($conn, $query);
+
+    $words = preg_split('/\s+/', trim($query), -1, PREG_SPLIT_NO_EMPTY);
+    $results = [];
+    foreach ($words as $word) {
+        foreach (RecipesModel\search($conn, $word) as $recipe) {
+            $results[$recipe['id']] = $recipe;
+        }
+    }
+    $recipes = array_values($results);
 
     global $content, $title;
     $title = "Recherche : " . htmlspecialchars($query);
