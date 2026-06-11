@@ -11,7 +11,7 @@
         <h1 class="text-3xl font-bold mb-4"><?php echo $recipe['name'];  ?></h1>
         <div class="flex items-center mb-4">
             <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
-            <span>4.9</span>
+            <span><?php echo number_format($recipe['avg_rating'], 1); ?></span>
             <span class="ml-4 text-gray-700"><i class="fas fa-clock"></i> <?php echo $recipe['prep_time'];  ?></span>
         </div>
         <p class="text-gray-700 mb-4">
@@ -19,7 +19,7 @@
         </p>
         <div class="flex items-center mb-4">
             <span class="text-gray-700 mr-2">Par <?php echo $recipe['user_id'];  ?></span>
-            <span class="text-gray-500"><i class="fas fa-comment"></i> 12 commentaires</span>
+            <span class="text-gray-500"><i class="fas fa-comment"></i> <?php echo count($comments); ?> commentaires</span>
         </div>
     </div>
 

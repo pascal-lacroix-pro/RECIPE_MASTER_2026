@@ -16,7 +16,7 @@
                 <h3 class="text-xl font-bold mb-2"><?php echo $recipe['name']; ?></h3>
                 <div class="flex items-center mb-2">
                     <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
-                    <span>4.5</span>
+                    <span><?php echo number_format($recipe['avg_rating'], 1); ?></span>
                 </div>
                 <p class="text-gray-600"><?php echo \Core\Helpers\truncate($recipe['description'], 50); ?></p>
                 <div class="flex items-center mt-4">
