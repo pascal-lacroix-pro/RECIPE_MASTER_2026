@@ -40,7 +40,9 @@ function searchAction(PDO $conn, string $query)
 function showAction(PDO $conn, int $id)
 {
     include_once '../app/models/recipesModel.php';
+    include_once '../app/models/commentsModel.php';
     $recipe = RecipesModel\findOneById($conn, $id);
+    $comments = \App\Models\CommentsModel\findAllByRecipeId($conn, $recipe['id']);
 
     global $content, $title;
     $title = $recipe['name'];
