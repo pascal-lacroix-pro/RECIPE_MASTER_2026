@@ -1,0 +1,74 @@
+Directory structure:
+└── pascal-lacroix-pro-recipe_master_2026/
+    ├── README.md
+    ├── DÉFI MVC.txt
+    ├── app/
+    │   ├── config/
+    │   │   └── params_example.php
+    │   ├── controllers/
+    │   │   ├── categoriesController.php
+    │   │   ├── ingredientsController.php
+    │   │   ├── pagesController.php
+    │   │   ├── recipesController.php
+    │   │   └── usersController.php
+    │   ├── models/
+    │   │   ├── categoriesModel.php
+    │   │   ├── commentsModel.php
+    │   │   ├── ingredientsModel.php
+    │   │   ├── recipesModel.php
+    │   │   └── usersModel.php
+    │   ├── routers/
+    │   │   ├── categories.php
+    │   │   ├── index.php
+    │   │   ├── ingredients.php
+    │   │   ├── recipes.php
+    │   │   └── users.php
+    │   └── views/
+    │       ├── categories/
+    │       │   ├── _index.php
+    │       │   └── show.php
+    │       ├── comments/
+    │       │   └── _index.php
+    │       ├── ingredients/
+    │       │   ├── _index.php
+    │       │   └── show.php
+    │       ├── pages/
+    │       │   └── home.php
+    │       ├── recipes/
+    │       │   ├── _index.php
+    │       │   ├── _latestByUserId.php
+    │       │   ├── _populars.php
+    │       │   ├── _random.php
+    │       │   ├── index.php
+    │       │   ├── search.php
+    │       │   └── show.php
+    │       ├── templates/
+    │       │   ├── default.php
+    │       │   └── partials/
+    │       │       ├── _aside.php
+    │       │       ├── _footer.php
+    │       │       ├── _head.php
+    │       │       ├── _main.php
+    │       │       └── _nav.php
+    │       └── users/
+    │           ├── _index.php
+    │           ├── _random.php
+    │           ├── _single.php
+    │           ├── index.php
+    │           └── show.php
+    ├── core/
+    │   ├── connection.php
+    │   ├── helpers.php
+    │   └── init.php
+    ├── documents/
+    │   ├── db/
+    │   │   └── v_recipes.sql
+    │   ├── GPS/
+    │   │   └── ROUTE pages.home.txt
+    │   └── template/
+    │       ├── index.html
+    │       ├── recipe.html
+    │       ├── resultats.html
+    │       └── user.html
+    └── public/
+        └── index.php

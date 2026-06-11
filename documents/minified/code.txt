@@ -1,0 +1,2732 @@
+================================================
+FILE: README.md
+================================================
+# RECIPE MASTER 2026
+Un projet basé sur une architecture MVC procédurale.
+
+## Installation
+* Lancez votre serveur web (Mamp/Wamp ou Xamp ...)
+* Chargez la db_remplie sur votre serveur mySQL
+* Importez ensuite ./documents/db/v_recipes.sql pour créer la VIEW requise
+* Placez le dossier complet dans le dossier racine de votre serveur web (htdocs, www, ...)
+* Renommez ./app/config/params_example.php en ./app/config/params.php
+* Modifier les données dans ./app/config/params.php
+* Testez via localhost/path_du_dossier.
+
+
+
+================================================
+FILE: DÉFI MVC.txt
+================================================
+DÉFI MVC: RECIPE MASTER
+
+MUST
+	1. Route recipes.index depuis le lien du menu
+	2. Route users.index depuis le lien du menu
+	3. Route users.show depuis les liens vers les users
+	4. Route categories.show quand on clique sur une catégorie
+	5. Route ingredients.show quand on clique sur un ingrédient
+
+SHOULD
+	1. Route recipes.search: recherche full-text sur titre et desc des recipes
+	2. Liste des Commentaires dans la recipes.show
+	
+COULD
+	1. Nombre de recettes par ingredients dans le menu
+	   ex: Aubergine (32)
+	2. Nombre de comments à côté du titre dans les listes de recipes
+       ex: Instant Pot Chili Mac [💬 3]
+	3. Tri par popularité des recipes de la homepage via une procédure stockée
+	4. La recherche porte sur plusieurs mots
+	5. Pagination (afficher 6 recipes à la fois et passer d'une page à l'autre)
+	   Prec | 1 | 2 | 3 ... | 9 | Next
+
+
+================================================
+FILE: app/config/params_example.php
+================================================
+<?php
+
+// 1. Intitialiser les zones dynamiques: $title et $content
+$title = "";
+$content = "Aucun contenu ne correspond à votre requête.";
+
+// 2. Définir les constantes de connexion 
+//    DB_HOST, DB_NAME, DB_USER, DB_PASSWORD
+
+define("DB_HOST", "your_host");
+define("DB_NAME", "your_database");
+define("DB_USER", "your_username");
+define("DB_PASSWORD", "your_password");
+
+
+
+================================================
+FILE: app/controllers/categoriesController.php
+================================================
+<?php
+
+namespace App\Controllers\CategoriesController;
+
+use \PDO;
+use \App\Models\CategoriesModel;
+use \App\Models\RecipesModel;
+
+function showAction(PDO $conn, int $id)
+{
+    include_once '../app/models/categoriesModel.php';
+    include_once '../app/models/recipesModel.php';
+
+    $category = CategoriesModel\findOneById($conn, $id);
+    if (!$category) {
+        header('Location: ?');
+        exit;
+    }
+    $recipes = RecipesModel\findAllByTypeId($conn, $category['id']);
+
+    global $content, $title;
+    $title = $category['name'];
+    ob_start();
+    include '../app/views/categories/show.php';
+    $content = ob_get_clean();
+}
+
+
+
+================================================
+FILE: app/controllers/ingredientsController.php
+================================================
+<?php
+
+namespace App\Controllers\IngredientsController;
+
+use \PDO;
+use \App\Models\IngredientsModel;
+use \App\Models\RecipesModel;
+
+function showAction(PDO $conn, int $id)
+{
+    include_once '../app/models/ingredientsModel.php';
+    include_once '../app/models/recipesModel.php';
+
+    $ingredient = IngredientsModel\findOneById($conn, $id);
+    if (!$ingredient) {
+        header('Location: ?');
+        exit;
+    }
+    $recipes = RecipesModel\findAllByIngredientId($conn, $ingredient['id']);
+
+    global $content, $title;
+    $title = $ingredient['name'];
+    ob_start();
+    include '../app/views/ingredients/show.php';
+    $content = ob_get_clean();
+}
+
+
+
+================================================
+FILE: app/controllers/pagesController.php
+================================================
+<?php
+
+namespace App\Controllers\PagesController;
+
+use \PDO;
+use \App\Models\RecipesModel;
+use \App\Models\UsersModel;
+
+function homeAction(PDO $conn)
+{
+    include_once '../app/models/recipesModel.php';
+    include_once '../app/models/usersModel.php';
+    $randomRecipe = RecipesModel\findOneByRand($conn);
+    $recipes = RecipesModel\findAllPopulars($conn);
+    $user = UsersModel\findOneByRand($conn);
+    $userLatestRecipes = RecipesModel\findAllByUserId($conn, $user['id']);
+
+    global $title, $content;
+    $title = "Home";
+    ob_start();
+    include '../app/views/pages/home.php';
+    $content = ob_get_clean();
+}
+
+
+
+================================================
+FILE: app/controllers/recipesController.php
+================================================
+<?php
+
+namespace App\Controllers\RecipesController;
+
+use \PDO;
+use \App\Models\RecipesModel;
+use \App\Models\CommentsModel;
+
+function indexAction(PDO $conn, int $page = 1, int $limit = 9)
+{
+    include_once '../app/models/recipesModel.php';
+    $totalPages = max(1, (int)ceil(RecipesModel\countAll($conn) / $limit));
+    $page = max(1, min($page, $totalPages));
+    $offset = ($page - 1) * $limit;
+    $recipes = RecipesModel\findAll($conn, $limit, $offset);
+
+    global $content, $title;
+    $title = RECIPES_INDEX_TITLE;
+    ob_start();
+    include '../app/views/recipes/index.php';
+    $content = ob_get_clean();
+}
+
+function searchAction(PDO $conn, string $query)
+{
+    include_once '../app/models/recipesModel.php';
+
+    $words = preg_split('/\s+/', trim($query), -1, PREG_SPLIT_NO_EMPTY);
+    $results = [];
+    foreach ($words as $word) {
+        foreach (RecipesModel\search($conn, $word) as $recipe) {
+            $results[$recipe['id']] = $recipe;
+        }
+    }
+    $recipes = array_values($results);
+
+    global $content, $title;
+    $title = "Recherche : " . htmlspecialchars($query);
+    ob_start();
+    include '../app/views/recipes/search.php';
+    $content = ob_get_clean();
+}
+
+function showAction(PDO $conn, int $id)
+{
+    include_once '../app/models/recipesModel.php';
+    include_once '../app/models/commentsModel.php';
+    $recipe = RecipesModel\findOneById($conn, $id);
+    if (!$recipe) {
+        header('Location: ?recipes');
+        exit;
+    }
+    $comments = CommentsModel\findAllByRecipeId($conn, $recipe['id']);
+
+    global $content, $title;
+    $title = $recipe['name'];
+    ob_start();
+    include '../app/views/recipes/show.php';
+    $content = ob_get_clean();
+}
+
+
+
+================================================
+FILE: app/controllers/usersController.php
+================================================
+<?php
+
+namespace App\Controllers\UsersController;
+
+use \PDO;
+use \App\Models\UsersModel;
+use \App\Models\RecipesModel;
+
+function indexAction(PDO $conn, int $limit = 9)
+{
+    include_once '../app/models/usersModel.php';
+    $users = UsersModel\findAll($conn, $limit);
+
+    global $content, $title;
+    $title = USERS_INDEX_TITLE;
+    ob_start();
+    include '../app/views/users/index.php';
+    $content = ob_get_clean();
+}
+
+function showAction(PDO $conn, int $id)
+{
+    include_once '../app/models/usersModel.php';
+    include_once '../app/models/recipesModel.php';
+
+    $user = UsersModel\findOneById($conn, $id);
+    if (!$user) {
+        header('Location: ?users');
+        exit;
+    }
+    $userLatestRecipes = RecipesModel\findAllByUserId($conn, $user['id']);
+
+    global $content, $title;
+    $title = $user['name'];
+    ob_start();
+    include '../app/views/users/show.php';
+    $content = ob_get_clean();
+}
+
+
+
+================================================
+FILE: app/models/categoriesModel.php
+================================================
+<?php
+
+namespace App\Models\CategoriesModel;
+
+use \PDO;
+
+function findAll(PDO $conn)
+{
+    $sql = "SELECT *
+            FROM types_of_recipes
+            ORDER BY name ASC;";
+    $rs = $conn->query($sql);
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function findOneById(PDO $conn, int $id)
+{
+    $sql = "SELECT *
+            FROM types_of_recipes
+            WHERE id = :id";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':id', $id, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetch(PDO::FETCH_ASSOC);
+}
+
+
+
+================================================
+FILE: app/models/commentsModel.php
+================================================
+<?php
+
+namespace App\Models\CommentsModel;
+
+use \PDO;
+
+function findAllByRecipeId(PDO $conn, int $recipeId)
+{
+    $sql = "SELECT *
+            FROM comments
+            WHERE recipe_id = :recipeId
+            ORDER BY created_at DESC;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':recipeId', $recipeId, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+
+
+================================================
+FILE: app/models/ingredientsModel.php
+================================================
+<?php
+
+namespace App\Models\IngredientsModel;
+
+use \PDO;
+
+function findAll(PDO $conn)
+{
+    $sql = "SELECT ingredients.*, COUNT(rhi.recipe_id) AS recipes_count
+            FROM ingredients
+            LEFT JOIN recipes_has_ingredients rhi ON ingredients.id = rhi.ingredient_id
+            GROUP BY ingredients.id
+            ORDER BY ingredients.name ASC;";
+    $rs = $conn->query($sql);
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function findOneById(PDO $conn, int $id)
+{
+    $sql = "SELECT *
+            FROM ingredients
+            WHERE id = :id";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':id', $id, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetch(PDO::FETCH_ASSOC);
+}
+
+
+
+================================================
+FILE: app/models/recipesModel.php
+================================================
+<?php
+
+namespace App\Models\RecipesModel;
+
+use \PDO;
+
+function findOneByRand(PDO $conn): array
+{
+    $sql = "SELECT *
+            FROM v_recipes
+            ORDER BY RAND()
+            LIMIT 1;";
+    $rs = $conn->query($sql);
+    return $rs->fetch(PDO::FETCH_ASSOC);
+}
+
+function countAll(PDO $conn): int
+{
+    $rs = $conn->query("SELECT COUNT(*) FROM recipes;");
+    return (int)$rs->fetchColumn();
+}
+
+function findAll(PDO $conn, int $limit = 9, int $offset = 0)
+{
+    $sql = "SELECT *
+            FROM v_recipes
+            ORDER BY created_at DESC
+            LIMIT :limit
+            OFFSET :offset;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(":limit", $limit, PDO::PARAM_INT);
+    $rs->bindValue(":offset", $offset, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function findAllPopulars(PDO $conn)
+{
+    $sql = "SELECT *
+            FROM v_recipes
+            ORDER BY avg_rating DESC
+            LIMIT 3;";
+    $rs = $conn->query($sql);
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function findAllByUserId(PDO $conn, int $userId)
+{
+    $sql = "SELECT *
+            FROM v_recipes
+            WHERE user_id = :userId
+            ORDER BY created_at DESC
+            LIMIT 3;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':userId', $userId, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function findAllByTypeId(PDO $conn, int $typeId)
+{
+    $sql = "SELECT *
+            FROM v_recipes
+            WHERE type_id = :typeId
+            ORDER BY created_at DESC;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':typeId', $typeId, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function findAllByIngredientId(PDO $conn, int $ingredientId)
+{
+    $sql = "SELECT v_recipes.*
+            FROM v_recipes
+            JOIN recipes_has_ingredients rhi ON v_recipes.id = rhi.recipe_id
+            WHERE rhi.ingredient_id = :ingredientId
+            ORDER BY created_at DESC;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':ingredientId', $ingredientId, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function search(PDO $conn, string $query)
+{
+    $sql = "SELECT *
+            FROM v_recipes
+            WHERE name LIKE :query
+               OR description LIKE :query
+            ORDER BY created_at DESC;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':query', '%' . $query . '%', PDO::PARAM_STR);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function findOneById(PDO $conn, int $id)
+{
+    $sql = "SELECT *
+            FROM v_recipes
+            WHERE id = :id";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(':id', $id, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetch(PDO::FETCH_ASSOC);
+}
+
+
+
+================================================
+FILE: app/models/usersModel.php
+================================================
+<?php
+
+namespace App\Models\UsersModel;
+
+use \PDO;
+
+function findAll(PDO $conn, int $limit = 9)
+{
+    $sql = "SELECT *
+            FROM users
+            ORDER BY created_at DESC
+            LIMIT :limit;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(":limit", $limit, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function findOneByRand(PDO $conn)
+{
+    $sql = "SELECT *
+            FROM users
+            ORDER BY RAND()
+            LIMIT 1;";
+    $rs = $conn->query($sql);
+    return $rs->fetch(PDO::FETCH_ASSOC);
+}
+
+function findOneById(PDO $conn, int $id)
+{
+    $sql = "SELECT *
+            FROM users
+            WHERE id= :id;";
+    $rs = $conn->prepare($sql);
+    $rs->bindValue(":id", $id, PDO::PARAM_INT);
+    $rs->execute();
+    return $rs->fetch(PDO::FETCH_ASSOC);
+}
+
+
+
+================================================
+FILE: app/routers/categories.php
+================================================
+<?php
+
+use \App\Controllers\CategoriesController;
+
+include_once '../app/controllers/categoriesController.php';
+
+switch ($_GET['categories']):
+    case 'show':
+        CategoriesController\showAction($conn, (int)($_GET['id'] ?? 0));
+        break;
+    default:
+        break;
+endswitch;
+
+
+
+================================================
+FILE: app/routers/index.php
+================================================
+<?php
+// Si on a un ?recipes=xxx
+// On charge le router ./app/routers/recipes.php
+if (isset($_GET['recipes'])):
+    include_once '../app/routers/recipes.php';
+
+// Si on a un ?users=xxx
+// On charge le router ./app/routers/users.php
+elseif (isset($_GET['users'])):
+    include_once '../app/routers/users.php';
+
+// Si on a un ?categories=xxx
+// On charge le router ./app/routers/categories.php
+elseif (isset($_GET['categories'])):
+    include_once '../app/routers/categories.php';
+
+// Si on a un ?ingredients=xxx
+// On charge le router ./app/routers/ingredients.php
+elseif (isset($_GET['ingredients'])):
+    include_once '../app/routers/ingredients.php';
+
+// ROUTE PAR DÉFAUT
+// PATTERN: /
+// CTRL: pagesController (composite)
+// ACTION: home
+else:
+    include_once '../app/controllers/pagesController.php';
+    \App\Controllers\PagesController\homeAction($conn);
+endif;
+
+
+
+================================================
+FILE: app/routers/ingredients.php
+================================================
+<?php
+
+use \App\Controllers\IngredientsController;
+
+include_once '../app/controllers/ingredientsController.php';
+
+switch ($_GET['ingredients']):
+    case 'show':
+        IngredientsController\showAction($conn, (int)($_GET['id'] ?? 0));
+        break;
+    default:
+        break;
+endswitch;
+
+
+
+================================================
+FILE: app/routers/recipes.php
+================================================
+<?php
+
+use \App\Controllers\RecipesController;
+
+include_once '../app/controllers/recipesController.php';
+
+switch ($_GET['recipes']):
+    case 'show':
+        RecipesController\showAction($conn, (int)($_GET['id'] ?? 0));
+        break;
+    case 'search':
+        RecipesController\searchAction($conn, $_GET['q'] ?? '');
+        break;
+    default:
+        RecipesController\indexAction($conn, (int)($_GET['page'] ?? 1));
+        break;
+endswitch;
+
+
+
+================================================
+FILE: app/routers/users.php
+================================================
+<?php
+
+use \App\Controllers\UsersController;
+
+include_once '../app/controllers/usersController.php';
+
+switch ($_GET['users']):
+    case 'show':
+        UsersController\showAction($conn, (int)($_GET['id'] ?? 0));
+        break;
+    default:
+        UsersController\indexAction($conn);
+        break;
+endswitch;
+
+
+
+================================================
+FILE: app/views/categories/_index.php
+================================================
+<?php
+
+/**  @var array $categories [id, title, ...]*/
+?>
+<h2 class="font-bold text-lg mb-4">Catégories</h2>
+<ul class="list-reset text-gray-100">
+    <?php foreach ($categories as $category): ?>
+        <li>
+            <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="?categories=show&id=<?php echo $category["id"]; ?>">
+                <?php echo $category["name"]; ?>
+            </a>
+        </li>
+    <?php endforeach; ?>
+</ul>
+
+
+================================================
+FILE: app/views/categories/show.php
+================================================
+<?php
+
+/**
+ * @var array $category [id, name, description, ...]
+ * @var array $recipes [id, name, ...]
+ */
+?>
+<h2 class="text-2xl font-bold mb-2"><?php echo htmlspecialchars($category['name']); ?></h2>
+<p class="text-gray-600 mb-6"><?php echo htmlspecialchars($category['description']); ?></p>
+
+<?php include '../app/views/recipes/_index.php'; ?>
+
+
+
+================================================
+FILE: app/views/comments/_index.php
+================================================
+<?php
+
+/** @var array $comments [id, content, created_at, user_id, recipe_id] */
+?>
+<?php foreach ($comments as $comment): ?>
+    <div class="mb-4">
+        <div class="flex items-center mb-2">
+            <img
+                src="./pictures/user_<?php echo $comment['user_id']; ?>.jpeg"
+                alt="user <?php echo $comment['user_id']; ?>"
+                class="w-10 h-10 rounded-full mr-2 object-cover" />
+            <span class="text-gray-500 text-sm"><?php echo $comment['created_at']; ?></span>
+        </div>
+        <p class="text-gray-700"><?php echo htmlspecialchars($comment['content']); ?></p>
+    </div>
+<?php endforeach; ?>
+
+
+
+================================================
+FILE: app/views/ingredients/_index.php
+================================================
+<?php
+
+/**  @var array $ingredients [id, name, unit, ...] */
+?>
+<h2 class="font-bold text-lg mb-4">Ingrédients</h2>
+<ul class="list-reset text-gray-200">
+    <?php foreach ($ingredients as $ingredient): ?>
+        <li>
+            <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="?ingredients=show&id=<?php echo $ingredient['id']; ?>">
+                <?php echo $ingredient['name']; ?> (<?php echo $ingredient['recipes_count']; ?>)
+            </a>
+        </li>
+    <?php endforeach; ?>
+</ul>
+
+
+
+================================================
+FILE: app/views/ingredients/show.php
+================================================
+<?php
+
+/**
+ * @var array $ingredient [id, name, unit, ...]
+ * @var array $recipes [id, name, ...]
+ */
+?>
+<h2 class="text-2xl font-bold mb-6"><?php echo htmlspecialchars($ingredient['name']); ?></h2>
+
+<?php include '../app/views/recipes/_index.php'; ?>
+
+
+
+================================================
+FILE: app/views/pages/home.php
+================================================
+<!-- Hero Recipe Card -->
+<?php include '../app/views/recipes/_random.php'; ?>
+
+<!-- SECTION DES POPULAR RECIPES -->
+<?php include '../app/views/recipes/_populars.php'; ?>
+
+<!-- SECTION RANDOM AUTHOR AVEC SES RECIPES -->
+<?php include '../app/views/users/_random.php'; ?>
+
+
+================================================
+FILE: app/views/recipes/_index.php
+================================================
+<?php
+
+/**  @var array $recipes [id, title, ...]*/
+?>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+    <?php foreach ($recipes as $recipe): ?>
+        <!-- Recipe Card -->
+        <article
+            class="bg-white rounded-lg overflow-hidden shadow-lg relative">
+            <img
+                class="w-full h-48 object-cover"
+                src="<?php echo htmlspecialchars($recipe['picture']); ?>"
+                alt="<?php echo htmlspecialchars($recipe['name']); ?>" />
+            <div class="p-4">
+                <h3 class="text-xl font-bold mb-2"><?php echo htmlspecialchars($recipe['name']); ?></h3>
+                <div class="flex items-center mb-2">
+                    <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
+                    <span><?php echo number_format($recipe['avg_rating'], 1); ?></span>
+                </div>
+                <p class="text-gray-600"><?php echo \Core\Helpers\truncate($recipe['description'], 50); ?></p>
+                <div class="flex items-center mt-4">
+                    <span class="text-gray-700 mr-2">Par <?php echo $recipe['user_id']; ?></span>
+                    <span class="text-gray-500"><i class="fas fa-comment"></i> <?php echo $recipe['comments_count']; ?> commentaires</span>
+                </div>
+                <a
+                    href="?recipes=show&id=<?php echo $recipe['id']; ?>"
+                    class="inline-block mt-4 bg-red-500 hover:bg-red-800 rounded-full px-4 py-2 text-white">
+                    Voir la recette
+                </a>
+            </div>
+        </article>
+    <?php endforeach; ?>
+</div>
+
+
+================================================
+FILE: app/views/recipes/_latestByUserId.php
+================================================
+<?php
+
+/**  @var array $userLatestRecipes [id, title, ...]*/
+?>
+<div>
+    <h4
+        class="text-xl font-bold mb-4 border-b-2 border-yellow-500 pb-2">
+        Mes dernières recettes
+    </h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <?php foreach ($userLatestRecipes as $recipe): ?>
+            <!-- Recipe Card (Repeat for each recipe) -->
+            <article
+                class="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative">
+                <img
+                    src="<?php echo htmlspecialchars($recipe['picture']); ?>"
+                    alt="<?php echo htmlspecialchars($recipe['name']); ?>"
+                    class="w-full h-48 object-cover" />
+                <div class="p-4">
+                    <h5 class="text-lg font-bold mb-2">
+                        <?php echo htmlspecialchars($recipe['name']); ?>
+                    </h5>
+                    <div class="flex items-center mb-2">
+                        <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
+                        <span><?php echo number_format($recipe['avg_rating'], 1); ?></span>
+                    </div>
+                    <p class="text-gray-500">
+                        <?php echo \Core\Helpers\truncate($recipe['description'], 50); ?>
+                    </p>
+                    <a
+                        href="?recipes=show&id=<?php echo $recipe['id']; ?>"
+                        class="text-yellow-500 hover:text-yellow-600 mt-2 inline-block">Voir la recette</a>
+                </div>
+            </article>
+        <?php endforeach; ?>
+
+    </div>
+</div>
+
+
+================================================
+FILE: app/views/recipes/_populars.php
+================================================
+<?php
+
+/**  @var array $recipes [id, title, ...]*/
+?>
+<section>
+    <h2 class="text-2xl font-bold mb-4">Recettes populaires</h2>
+    <?php include "../app/views/recipes/_index.php"; ?>
+</section>
+
+
+================================================
+FILE: app/views/recipes/_random.php
+================================================
+<?php
+
+/**  @var array $randomRecipe [id, title, ...]*/
+?>
+<section class="relative mb-6">
+    <img
+        class="w-full h-96 object-cover"
+        src="<?php echo htmlspecialchars($randomRecipe['picture']); ?>"
+        alt="<?php echo htmlspecialchars($randomRecipe['name']); ?>" />
+    <div
+        class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-gray-900 to-transparent">
+        <h1 class="text-3xl font-bold mb-2 text-white">
+            <?php echo htmlspecialchars($randomRecipe['name']); ?>
+        </h1>
+        <div class="flex items-center mb-4">
+            <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
+            <span class="text-white"><?php echo number_format($randomRecipe['avg_rating'], 1); ?></span>
+        </div>
+        <p class="text-gray-300 mb-4">
+            <?php echo htmlspecialchars(\Core\Helpers\truncate($randomRecipe['description'], 200)); ?>
+        </p>
+        <div class="flex items-center mb-4">
+            <span class="text-gray-400 mr-2">Par <?php echo $randomRecipe['user_id']; ?></span>
+            <span class="text-gray-500"><i class="fas fa-comment"></i> <?php echo $randomRecipe['comments_count']; ?> commentaires</span>
+        </div>
+        <a
+            href="?recipes=show&id=<?php echo $randomRecipe['id']; ?>"
+            class="inline-block bg-red-500 hover:bg-red-800 rounded-full px-4 py-2 text-white">
+            Voir la recette
+        </a>
+    </div>
+</section>
+
+
+================================================
+FILE: app/views/recipes/index.php
+================================================
+<?php
+
+/**
+ * @var array $recipes     [id, name, ...]
+ * @var int   $page
+ * @var int   $totalPages
+ */
+?>
+<section>
+    <h2 class="text-2xl font-bold mb-4">Dernières recettes</h2>
+    <?php include "../app/views/recipes/_index.php"; ?>
+
+    <?php if ($totalPages > 1): ?>
+        <nav class="flex justify-center items-center gap-2 mt-8">
+            <?php if ($page > 1): ?>
+                <a href="?recipes&page=<?php echo $page - 1; ?>"
+                   class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-full">
+                    &laquo;
+                </a>
+            <?php endif; ?>
+
+            <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                <a href="?recipes&page=<?php echo $i; ?>"
+                   class="px-4 py-2 rounded-full <?php echo $i === $page ? 'bg-red-500 text-white' : 'bg-gray-200 hover:bg-gray-300'; ?>">
+                    <?php echo $i; ?>
+                </a>
+            <?php endfor; ?>
+
+            <?php if ($page < $totalPages): ?>
+                <a href="?recipes&page=<?php echo $page + 1; ?>"
+                   class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-full">
+                    &raquo;
+                </a>
+            <?php endif; ?>
+        </nav>
+    <?php endif; ?>
+</section>
+
+
+================================================
+FILE: app/views/recipes/search.php
+================================================
+<?php
+
+/**
+ * @var array  $recipes [id, name, ...]
+ * @var string $query
+ */
+?>
+<h2 class="text-2xl font-bold mb-6">Recherche : <em><?php echo htmlspecialchars($query); ?></em></h2>
+
+<?php if (empty($recipes)): ?>
+    <p class="text-gray-600">Aucune recette trouvée.</p>
+<?php else: ?>
+    <?php include '../app/views/recipes/_index.php'; ?>
+<?php endif; ?>
+
+
+
+================================================
+FILE: app/views/recipes/show.php
+================================================
+<?php
+
+/**
+ * @var array $recipe   [id, name, avg_rating, comments_count, ...]
+ * @var array $comments [id, content, created_at, user_id, ...]
+ */
+?>
+<section class="bg-white rounded-lg shadow-lg p-6 mb-6">
+    <!-- Recipe Image -->
+    <img class="w-full h-96 object-cover rounded-t-lg" src="<?php echo htmlspecialchars($recipe['picture']); ?>" alt="<?php echo htmlspecialchars($recipe['name']); ?>">
+
+    <!-- Recipe Info -->
+    <div class="p-4">
+        <h1 class="text-3xl font-bold mb-4"><?php echo htmlspecialchars($recipe['name']); ?></h1>
+        <div class="flex items-center mb-4">
+            <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
+            <span><?php echo number_format($recipe['avg_rating'], 1); ?></span>
+            <span class="ml-4 text-gray-700"><i class="fas fa-clock"></i> <?php echo $recipe['prep_time'];  ?></span>
+        </div>
+        <p class="text-gray-700 mb-4">
+            <?php echo $recipe['description'];  ?>
+        </p>
+        <div class="flex items-center mb-4">
+            <span class="text-gray-700 mr-2">Par <?php echo $recipe['user_id'];  ?></span>
+            <span class="text-gray-500"><i class="fas fa-comment"></i> <?php echo count($comments); ?> commentaires</span>
+        </div>
+    </div>
+
+    <!-- Ingredients -->
+    <div class="p-4 border-t">
+        <h2 class="text-2xl font-bold mb-4">Ingrédients</h2>
+        <ul class="list-disc pl-5">
+            <li>200g de farine</li>
+            <li>100g de sucre</li>
+            <li>3 œufs</li>
+            <!-- ... (autres ingrédients) ... -->
+        </ul>
+    </div>
+
+
+
+    <!-- Comments -->
+    <div class="p-4 border-t">
+        <h2 class="text-2xl font-bold mb-4">Commentaires (<?php echo count($comments); ?>)</h2>
+        <?php include '../app/views/comments/_index.php'; ?>
+    </div>
+</section>
+
+
+================================================
+FILE: app/views/templates/default.php
+================================================
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <?php include '../app/views/templates/partials/_head.php'; ?>
+</head>
+
+<body
+    class="bg-gray-100 text-gray-800 font-sans leading-normal tracking-normal">
+
+    <?php include '../app/views/templates/partials/_nav.php'; ?>
+
+    <?php include '../app/views/templates/partials/_main.php'; ?>
+
+    <?php include '../app/views/templates/partials/_footer.php'; ?>
+
+</body>
+
+</html>
+
+
+================================================
+FILE: app/views/templates/partials/_aside.php
+================================================
+<aside class="w-full md:w-1/4 p-3">
+    <div class="bg-yellow-500 text-white rounded-lg shadow-md p-4 mb-4">
+        <?php
+        include_once "../app/models/categoriesModel.php";
+        $categories = \App\Models\CategoriesModel\findAll($conn);
+        include "../app/views/categories/_index.php";
+
+        ?>
+    </div>
+    <div class="bg-yellow-600 text-white rounded-lg shadow-md p-4">
+        <?php
+        include_once "../app/models/ingredientsModel.php";
+        $ingredients = \App\Models\IngredientsModel\findAll($conn);
+        include "../app/views/ingredients/_index.php";
+        ?>
+    </div>
+</aside>
+
+
+================================================
+FILE: app/views/templates/partials/_footer.php
+================================================
+<!-- Footer -->
+<footer class="bg-gray-800 text-white shadow-md">
+    <div class="container mx-auto flex py-8">
+        <div class="w-full mx-auto flex flex-wrap">
+            <div class="flex w-full lg:w-1/2">
+                <div class="px-8">
+                    <h3 class="font-bold">A propos</h3>
+                    <p class="py-4 text-sm">
+                        Découvrez les meilleures recettes de nos chefs talentueux et
+                        partagez vos propres créations culinaires.
+                    </p>
+                </div>
+            </div>
+            <div class="flex w-full lg:w-1/2 lg:justify-end lg:text-right">
+                <div class="px-8">
+                    <h3 class="font-bold">Contact</h3>
+                    <ul class="list-reset items-center text-sm">
+                        <li>
+                            <a
+                                class="inline-block hover:text-red-600 hover:underline py-1"
+                                href="#">
+                                Email: contact@recipemaster.com
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>
+
+
+================================================
+FILE: app/views/templates/partials/_head.php
+================================================
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RECIPE MASTER - <?php echo $title; ?></title>
+<link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" />
+<link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+<script src="//unpkg.com/alpinejs" defer></script>
+<style>
+    body {
+        font-family: "Poppins", sans-serif;
+    }
+</style>
+
+
+================================================
+FILE: app/views/templates/partials/_main.php
+================================================
+<!-- Main -->
+<!-- ... (reste du code précédent) ... -->
+
+<!-- Main -->
+<div class="container mx-auto flex flex-wrap pt-4 pb-12 text-gray-800">
+    <!-- Filters -->
+    <?php include '../app/views/templates/partials/_aside.php'; ?>
+
+    <!-- Main content -->
+    <main class="w-full md:w-3/4 p-3">
+        <?php echo $content; ?>
+    </main>
+</div>
+
+
+================================================
+FILE: app/views/templates/partials/_nav.php
+================================================
+<!-- Header -->
+<div x-data="{ open: false }" class="bg-gray-800">
+    <nav class="shadow-md">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <a
+                        class="text-white font-bold text-xl flex items-center"
+                        href="?">
+                        <i class="fas fa-utensils text-yellow-500 mr-2"></i> RECIPE
+                        MASTER
+                    </a>
+                </div>
+                <div class="flex md:hidden">
+                    <button
+                        @click="open = !open"
+                        type="button"
+                        class="text-white hover:text-yellow-500 focus:outline-none focus:text-yellow-500">
+                        <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
+                            <path
+                                x-show="!open"
+                                class="inline-flex"
+                                fill-rule="evenodd"
+                                clip-rule="evenodd"
+                                d="M4 6H20V8H4V6ZM4 11H20V13H4V11ZM4 16H20V18H4V16Z" />
+                            <path
+                                x-show="open"
+                                class="inline-flex"
+                                fill-rule="evenodd"
+                                clip-rule="evenodd"
+                                d="M4 6H20V8H4V6ZM4 11H20V13H4V11ZM4 16H20V18H4V16ZM6 21H18V19H6V21ZM6 3H18V1H6V3Z" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="hidden md:flex items-center space-x-4">
+                    <form method="get" action="">
+                        <input
+                            type="hidden"
+                            name="recipes"
+                            value="search" />
+                        <input
+                            type="text"
+                            name="q"
+                            placeholder="Rechercher une recette..."
+                            class="p-2 rounded-md" />
+                    </form>
+                    <a
+                        class="text-white hover:text-yellow-500 px-3 py-2"
+                        href="?recipes=index">Recettes</a>
+                    <a
+                        class="text-white hover:text-yellow-500 px-3 py-2"
+                        href="?users=index">Chefs</a>
+                </div>
+            </div>
+        </div>
+        <div x-show="open" class="md:hidden bg-gray-700">
+            <form method="get" action="">
+                <input
+                    type="hidden"
+                    name="recipes"
+                    value="search" />
+                <input
+                    type="text"
+                    name="q"
+                    placeholder="Rechercher une recette..."
+                    class="p-2 w-full" />
+            </form>
+            <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#">Recettes</a>
+            <a class="block text-white hover:text-yellow-500 px-3 py-2" href="?users=index">Chefs</a>
+        </div>
+    </nav>
+</div>
+
+
+================================================
+FILE: app/views/users/_index.php
+================================================
+<?php
+
+/**  @var array $users [id, title, ...]*/
+?>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+    <?php foreach ($users as $user): ?>
+        <!-- User Card -->
+        <article
+            class="bg-white rounded-lg overflow-hidden shadow-lg relative">
+            <img
+                class="w-full h-48 object-cover"
+                src="pictures/<?php echo htmlspecialchars($user['picture']); ?>"
+                alt="<?php echo htmlspecialchars($user['name']); ?>" />
+            <div class="p-4">
+                <h3 class="text-xl font-bold mb-2"><?php echo htmlspecialchars($user['name']); ?></h3>
+                <div class="flex items-center mb-2">
+                    <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
+                    <span>4.5</span>
+                </div>
+                <p class="text-gray-600"><?php echo \Core\Helpers\truncate($user['biography'], 50); ?></p>
+                <a
+                    href="?users=show&id=<?php echo $user['id']; ?>"
+                    class="inline-block mt-4 bg-red-500 hover:bg-red-800 rounded-full px-4 py-2 text-white">
+                    Voir le chef
+                </a>
+            </div>
+        </article>
+    <?php endforeach; ?>
+</div>
+
+
+================================================
+FILE: app/views/users/_random.php
+================================================
+<?php
+
+/**  @var array $user [id, username, ...]*/
+?>
+<?php include "../app/views/users/_single.php"; ?>
+
+
+================================================
+FILE: app/views/users/_single.php
+================================================
+<?php
+
+/**  @var array $user [id, username, ...]*/
+?>
+<section class="bg-gray-700 text-white rounded-lg shadow-2xl p-6 my-6">
+    <!-- User Info -->
+    <div class="flex items-center mb-6">
+        <!-- User Avatar -->
+        <img
+            src="pictures/<?php echo htmlspecialchars($user['picture']); ?>"
+            alt="<?php echo htmlspecialchars($user['name']); ?>"
+            class="w-24 h-24 rounded-full border-4 border-yellow-500 mr-4" />
+
+        <!-- User Details -->
+        <div>
+            <h3 class="text-2xl font-bold"><?php echo htmlspecialchars($user['name']); ?></h3>
+            <p class="text-gray-400">Membre depuis: <?php echo $user['created_at']; ?></p>
+            <p class="text-gray-400">Nombre de recettes postées: 10</p>
+        </div>
+    </div>
+
+    <!-- User Actions -->
+    <div class="flex justify-between items-center mb-4">
+        <a
+            href="user_recipes.html"
+            class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 rounded-full px-6 py-2">Voir mes recettes</a>
+    </div>
+
+    <!-- User's Latest Recipes -->
+    <?php include '../app/views/recipes/_latestByUserId.php'; ?>
+</section>
+
+
+================================================
+FILE: app/views/users/index.php
+================================================
+<?php
+
+/**  @var array $users [id, title, ...]*/
+?>
+<section>
+    <h2 class="text-2xl font-bold mb-4">Derniers chefs</h2>
+    <?php include "../app/views/users/_index.php"; ?>
+</section>
+
+
+================================================
+FILE: app/views/users/show.php
+================================================
+<?php
+
+/**  @var array $user [id, username, ...]*/
+?>
+<?php include "../app/views/users/_single.php"; ?>
+
+
+================================================
+FILE: core/connection.php
+================================================
+<?php
+
+
+try {
+    $conn = new PDO('mysql:host=' . DB_HOST . ';dbname=' . DB_NAME, DB_USER, DB_PASSWORD);
+} catch (PDOException $e) {
+    echo $e->getMessage();
+}
+
+
+
+================================================
+FILE: core/helpers.php
+================================================
+<?php
+
+namespace Core\Helpers;
+
+function truncate($text, $limit = 100)
+{
+    if (strlen($text) <= $limit) return $text;
+
+    // Coupe à la limite
+    $text = substr($text, 0, $limit);
+    // Recherche la position du dernier espace dans la chaîne tronquée
+    $last_space = strrpos($text, ' ');
+    // Recoupe la chaîne à cet espace
+    return substr($text, 0, $last_space) . '...';
+}
+
+
+
+================================================
+FILE: core/init.php
+================================================
+<?php
+
+require_once '../app/config/params.php';
+require_once '../core/connection.php';
+require_once '../core/helpers.php';
+
+
+
+================================================
+FILE: documents/db/v_recipes.sql
+================================================
+CREATE OR REPLACE VIEW v_recipes AS
+SELECT
+    recipes.*,
+    COUNT(DISTINCT c.id)    AS comments_count,
+    COALESCE(AVG(r.value), 0) AS avg_rating
+FROM recipes
+LEFT JOIN comments c  ON recipes.id = c.recipe_id
+LEFT JOIN ratings  r  ON recipes.id = r.recipe_id
+GROUP BY recipes.id;
+
+
+
+================================================
+FILE: documents/GPS/ROUTE pages.home.txt
+================================================
+ROUTE pages.home
+
+	RANDOM RECIPE - déjà fait !
+
+	POPULAR RECIPES
+		- Envoyez à la vue une variable $recipes (3 dernières) depuis recipesModel\findAllPopulars()
+		- Placez le code avec le foreach dans la vue pages.home
+
+
+	RANDOM AUTHOR + RECIPES
+		- Envoyez à la vue une variable $randomUser depuis authorsModel\findOneByRand()
+		- Envoyez à la vue une variable $userLatestRecipes depuis recipesModel\findAllByUserId()
+		  en lui envoyant l'id du $randomUser
+		- Placez le code de la section en bouclant les recipes
+
+
+
+================================================
+FILE: documents/template/index.html
+================================================
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RECIPE MASTER</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="//unpkg.com/alpinejs" defer></script>
+    <style>
+      body {
+        font-family: "Poppins", sans-serif;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gray-100 text-gray-800 font-sans leading-normal tracking-normal"
+  >
+    <!-- Header -->
+    <div x-data="{ open: false }" class="bg-gray-800">
+      <nav class="shadow-md">
+        <div class="container mx-auto px-4">
+          <div class="flex justify-between items-center py-4">
+            <div class="flex items-center">
+              <a
+                class="text-white font-bold text-xl flex items-center"
+                href="index.html"
+              >
+                <i class="fas fa-utensils text-yellow-500 mr-2"></i> RECIPE
+                MASTER
+              </a>
+            </div>
+            <div class="flex md:hidden">
+              <button
+                @click="open = !open"
+                type="button"
+                class="text-white hover:text-yellow-500 focus:outline-none focus:text-yellow-500"
+              >
+                <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
+                  <path
+                    x-show="!open"
+                    class="inline-flex"
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4 6H20V8H4V6ZM4 11H20V13H4V11ZM4 16H20V18H4V16Z"
+                  />
+                  <path
+                    x-show="open"
+                    class="inline-flex"
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4 6H20V8H4V6ZM4 11H20V13H4V11ZM4 16H20V18H4V16ZM6 21H18V19H6V21ZM6 3H18V1H6V3Z"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="hidden md:flex items-center space-x-4">
+              <input
+                type="text"
+                placeholder="Rechercher une recette..."
+                class="p-2 rounded-md"
+              />
+              <a
+                class="text-white hover:text-yellow-500 px-3 py-2"
+                href="recipes.html"
+                >Recettes</a
+              >
+              <a
+                class="text-white hover:text-yellow-500 px-3 py-2"
+                href="chefs.html"
+                >Chefs</a
+              >
+            </div>
+          </div>
+        </div>
+        <div x-show="open" class="md:hidden bg-gray-700">
+          <input
+            type="text"
+            placeholder="Rechercher une recette..."
+            class="p-2 w-full"
+          />
+          <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#"
+            >Recettes</a
+          >
+          <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#"
+            >Chefs</a
+          >
+        </div>
+      </nav>
+    </div>
+
+    <!-- Main -->
+    <!-- ... (reste du code précédent) ... -->
+
+    <!-- Main -->
+    <div class="container mx-auto flex flex-wrap pt-4 pb-12 text-gray-800">
+      <!-- Filters -->
+      <aside class="w-full md:w-1/4 p-3">
+        <div class="bg-yellow-500 text-white rounded-lg shadow-md p-4 mb-4">
+          <h2 class="font-bold text-lg mb-4">Catégories</h2>
+          <ul class="list-reset text-gray-100">
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Entrées</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Plats principaux</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Desserts</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Végétarien</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Vegan</a
+              >
+            </li>
+          </ul>
+        </div>
+        <div class="bg-yellow-600 text-white rounded-lg shadow-md p-4">
+          <h2 class="font-bold text-lg mb-4">Ingrédients</h2>
+          <ul class="list-reset text-gray-200">
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Poulet</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Boeuf</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Poisson</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Légumes</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Fromage</a
+              >
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      <!-- Main content -->
+      <main class="w-full md:w-3/4 p-3">
+        <!-- Hero Recipe Card -->
+        <section class="relative mb-6">
+          <img
+            class="w-full h-96 object-cover"
+            src="https://source.unsplash.com/1600x900/?recipe"
+            alt="Featured Recipe Image"
+          />
+          <div
+            class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-gray-900 to-transparent"
+          >
+            <h1 class="text-3xl font-bold mb-2 text-white">
+              Nom de la recette en vedette
+            </h1>
+            <div class="flex items-center mb-4">
+              <span class="text-yellow-500 mr-1"
+                ><i class="fas fa-star"></i
+              ></span>
+              <span class="text-white">4.9</span>
+            </div>
+            <p class="text-gray-300 mb-4">
+              Description de la recette en vedette...
+            </p>
+            <div class="flex items-center mb-4">
+              <span class="text-gray-400 mr-2">Par Jean Dupont</span>
+              <span class="text-gray-500"
+                ><i class="fas fa-comment"></i> 12 commentaires</span
+              >
+            </div>
+            <a
+              href="recipe.html"
+              class="inline-block bg-red-500 hover:bg-red-800 rounded-full px-4 py-2 text-white"
+            >
+              Voir la recette
+            </a>
+          </div>
+        </section>
+        <section>
+          <h2 class="text-2xl font-bold mb-4">Recettes populaires</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Recipe Card -->
+            <article
+              class="bg-white rounded-lg overflow-hidden shadow-lg relative"
+            >
+              <img
+                class="w-full h-48 object-cover"
+                src="https://source.unsplash.com/480x360/?recipe"
+                alt="Recipe Image"
+              />
+              <div class="p-4">
+                <h3 class="text-xl font-bold mb-2">Nom de la recette</h3>
+                <div class="flex items-center mb-2">
+                  <span class="text-yellow-500 mr-1"
+                    ><i class="fas fa-star"></i
+                  ></span>
+                  <span>4.5</span>
+                </div>
+                <p class="text-gray-600">Description courte de la recette...</p>
+                <div class="flex items-center mt-4">
+                  <span class="text-gray-700 mr-2">Par Marie Durand</span>
+                  <span class="text-gray-500"
+                    ><i class="fas fa-comment"></i> 8 commentaires</span
+                  >
+                </div>
+                <a
+                  href="recipe.html"
+                  class="inline-block mt-4 bg-red-500 hover:bg-red-800 rounded-full px-4 py-2 text-white"
+                >
+                  Voir la recette
+                </a>
+              </div>
+            </article>
+            <!-- ... (autres cartes de recettes) ... -->
+            <!-- Recipe Card -->
+            <article
+              class="bg-white rounded-lg overflow-hidden shadow-lg relative"
+            >
+              <img
+                class="w-full h-48 object-cover"
+                src="https://source.unsplash.com/480x360/?recipe"
+                alt="Recipe Image"
+              />
+              <div class="p-4">
+                <h3 class="text-xl font-bold mb-2">Nom de la recette</h3>
+                <div class="flex items-center mb-2">
+                  <span class="text-yellow-500 mr-1"
+                    ><i class="fas fa-star"></i
+                  ></span>
+                  <span>4.5</span>
+                </div>
+                <p class="text-gray-600">Description courte de la recette...</p>
+                <div class="flex items-center mt-4">
+                  <span class="text-gray-700 mr-2">Par Marie Durand</span>
+                  <span class="text-gray-500"
+                    ><i class="fas fa-comment"></i> 8 commentaires</span
+                  >
+                </div>
+                <a
+                  href="recipe.html"
+                  class="inline-block mt-4 bg-red-500 hover:bg-red-800 rounded-full px-4 py-2 text-white"
+                >
+                  Voir la recette
+                </a>
+              </div>
+            </article>
+            <!-- Recipe Card -->
+            <article
+              class="bg-white rounded-lg overflow-hidden shadow-lg relative"
+            >
+              <img
+                class="w-full h-48 object-cover"
+                src="https://source.unsplash.com/480x360/?recipe"
+                alt="Recipe Image"
+              />
+              <div class="p-4">
+                <h3 class="text-xl font-bold mb-2">Nom de la recette</h3>
+                <div class="flex items-center mb-2">
+                  <span class="text-yellow-500 mr-1"
+                    ><i class="fas fa-star"></i
+                  ></span>
+                  <span>4.5</span>
+                </div>
+                <p class="text-gray-600">Description courte de la recette...</p>
+                <div class="flex items-center mt-4">
+                  <span class="text-gray-700 mr-2">Par Marie Durand</span>
+                  <span class="text-gray-500"
+                    ><i class="fas fa-comment"></i> 8 commentaires</span
+                  >
+                </div>
+                <a
+                  href="recipe.html"
+                  class="inline-block mt-4 bg-red-500 hover:bg-red-800 rounded-full px-4 py-2 text-white"
+                >
+                  Voir la recette
+                </a>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- User Profile Section -->
+        <section class="bg-gray-700 text-white rounded-lg shadow-2xl p-6 my-6">
+          <!-- User Info -->
+          <div class="flex items-center mb-6">
+            <!-- User Avatar -->
+            <img
+              src="https://source.unsplash.com/300x300/?portrait"
+              alt="Nom de l'utilisateur"
+              class="w-24 h-24 rounded-full border-4 border-yellow-500 mr-4"
+            />
+
+            <!-- User Details -->
+            <div>
+              <h3 class="text-2xl font-bold">Nom de l'utilisateur</h3>
+              <p class="text-gray-400">Membre depuis: Date d'inscription</p>
+              <p class="text-gray-400">Nombre de recettes postées: 10</p>
+            </div>
+          </div>
+
+          <!-- User Actions -->
+          <div class="flex justify-between items-center mb-4">
+            <a
+              href="user_recipes.html"
+              class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 rounded-full px-6 py-2"
+              >Voir mes recettes</a
+            >
+          </div>
+
+          <!-- User's Latest Recipes -->
+          <div>
+            <h4
+              class="text-xl font-bold mb-4 border-b-2 border-yellow-500 pb-2"
+            >
+              Mes dernières recettes
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <!-- Recipe Card (Repeat for each recipe) -->
+              <article
+                class="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative"
+              >
+                <img
+                  src="https://source.unsplash.com/480x360/?recipe"
+                  alt="Recipe Name"
+                  class="w-full h-48 object-cover"
+                />
+                <div class="p-4">
+                  <h5 class="text-lg font-bold mb-2">Nom de la recette</h5>
+                  <div class="flex items-center mb-2">
+                    <span class="text-yellow-500 mr-1"
+                      ><i class="fas fa-star"></i
+                    ></span>
+                    <span>4.5</span>
+                  </div>
+                  <p class="text-gray-500">
+                    Description courte de la recette...
+                  </p>
+                  <a
+                    href="recipe_detail.html"
+                    class="text-yellow-500 hover:text-yellow-600 mt-2 inline-block"
+                    >Voir la recette</a
+                  >
+                </div>
+              </article>
+              <!-- ... (autres cartes de recettes) ... -->
+              <!-- Recipe Card (Repeat for each recipe) -->
+              <article
+                class="bg-gray-800 rounded-lg overflow-hidden shadow-lg relative"
+              >
+                <img
+                  src="https://source.unsplash.com/480x360/?recipe"
+                  alt="Recipe Name"
+                  class="w-full h-48 object-cover"
+                />
+                <div class="p-4">
+                  <h5 class="text-lg font-bold mb-2">Nom de la recette</h5>
+                  <div class="flex items-center mb-2">
+                    <span class="text-yellow-500 mr-1"
+                      ><i class="fas fa-star"></i
+                    ></span>
+                    <span>4.5</span>
+                  </div>
+                  <p class="text-gray-500">
+                    Description courte de la recette...
+                  </p>
+                  <a
+                    href="recipe_detail.html"
+                    class="text-yellow-500 hover:text-yellow-600 mt-2 inline-block"
+                    >Voir la recette</a
+                  >
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- ... (reste du code précédent) ... -->
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white shadow-md">
+      <div class="container mx-auto flex py-8">
+        <div class="w-full mx-auto flex flex-wrap">
+          <div class="flex w-full lg:w-1/2">
+            <div class="px-8">
+              <h3 class="font-bold">A propos</h3>
+              <p class="py-4 text-sm">
+                Découvrez les meilleures recettes de nos chefs talentueux et
+                partagez vos propres créations culinaires.
+              </p>
+            </div>
+          </div>
+          <div class="flex w-full lg:w-1/2 lg:justify-end lg:text-right">
+            <div class="px-8">
+              <h3 class="font-bold">Contact</h3>
+              <ul class="list-reset items-center text-sm">
+                <li>
+                  <a
+                    class="inline-block hover:text-red-600 hover:underline py-1"
+                    href="#"
+                  >
+                    Email: contact@recipemaster.com
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+
+
+================================================
+FILE: documents/template/recipe.html
+================================================
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RECIPE MASTER</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="//unpkg.com/alpinejs" defer></script>
+    <style>
+      body {
+        font-family: "Poppins", sans-serif;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gray-100 text-gray-800 font-sans leading-normal tracking-normal"
+  >
+    <!-- Header -->
+    <div x-data="{ open: false }" class="bg-gray-800">
+      <nav class="shadow-md">
+        <div class="container mx-auto px-4">
+          <div class="flex justify-between items-center py-4">
+            <div class="flex items-center">
+              <a
+                class="text-white font-bold text-xl flex items-center"
+                href="index.html"
+              >
+                <i class="fas fa-utensils text-yellow-500 mr-2"></i> RECIPE
+                MASTER
+              </a>
+            </div>
+            <div class="flex md:hidden">
+              <button
+                @click="open = !open"
+                type="button"
+                class="text-white hover:text-yellow-500 focus:outline-none focus:text-yellow-500"
+              >
+                <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
+                  <path
+                    x-show="!open"
+                    class="inline-flex"
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4 6H20V8H4V6ZM4 11H20V13H4V11ZM4 16H20V18H4V16Z"
+                  />
+                  <path
+                    x-show="open"
+                    class="inline-flex"
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4 6H20V8H4V6ZM4 11H20V13H4V11ZM4 16H20V18H4V16ZM6 21H18V19H6V21ZM6 3H18V1H6V3Z"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="hidden md:flex items-center space-x-4">
+              <input
+                type="text"
+                placeholder="Rechercher une recette..."
+                class="p-2 rounded-md"
+              />
+              <a
+                class="text-white hover:text-yellow-500 px-3 py-2"
+                href="recipes.html"
+                >Recettes</a
+              >
+              <a
+                class="text-white hover:text-yellow-500 px-3 py-2"
+                href="chefs.html"
+                >Chefs</a
+              >
+            </div>
+          </div>
+        </div>
+        <div x-show="open" class="md:hidden bg-gray-700">
+          <input
+            type="text"
+            placeholder="Rechercher une recette..."
+            class="p-2 w-full"
+          />
+          <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#"
+            >Recettes</a
+          >
+          <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#"
+            >Chefs</a
+          >
+        </div>
+      </nav>
+    </div>
+
+    <!-- Main -->
+    <!-- ... (reste du code précédent) ... -->
+
+    <!-- Main -->
+    <div class="container mx-auto flex flex-wrap pt-4 pb-12 text-gray-800">
+      <!-- Filters -->
+      <aside class="w-full md:w-1/4 p-3">
+        <div class="bg-yellow-500 text-white rounded-lg shadow-md p-4 mb-4">
+          <h2 class="font-bold text-lg mb-4">Catégories</h2>
+          <ul class="list-reset text-gray-100">
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Entrées</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Plats principaux</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Desserts</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Végétarien</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Vegan</a
+              >
+            </li>
+          </ul>
+        </div>
+        <div class="bg-yellow-600 text-white rounded-lg shadow-md p-4">
+          <h2 class="font-bold text-lg mb-4">Ingrédients</h2>
+          <ul class="list-reset text-gray-200">
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Poulet</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Boeuf</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Poisson</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Légumes</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Fromage</a
+              >
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="w-full md:w-3/4 p-3">
+        <!-- Recipe Detail -->
+        <section class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <!-- Recipe Image -->
+          <img
+            class="w-full h-96 object-cover rounded-t-lg"
+            src="https://source.unsplash.com/1600x900/?recipe"
+            alt="Nom de la recette"
+          />
+
+          <!-- Recipe Info -->
+          <div class="p-4">
+            <h1 class="text-3xl font-bold mb-4">Nom de la recette</h1>
+            <div class="flex items-center mb-4">
+              <span class="text-yellow-500 mr-1"
+                ><i class="fas fa-star"></i
+              ></span>
+              <span>4.9</span>
+              <span class="ml-4 text-gray-700"
+                ><i class="fas fa-clock"></i> 45 minutes</span
+              >
+            </div>
+            <p class="text-gray-700 mb-4">
+              Description détaillée de la recette. Cette recette est parfaite
+              pour les occasions spéciales, les dîners en famille ou tout
+              simplement pour se faire plaisir.
+            </p>
+            <div class="flex items-center mb-4">
+              <span class="text-gray-700 mr-2">Par Jean Dupont</span>
+              <span class="text-gray-500"
+                ><i class="fas fa-comment"></i> 12 commentaires</span
+              >
+            </div>
+          </div>
+
+          <!-- Ingredients -->
+          <div class="p-4 border-t">
+            <h2 class="text-2xl font-bold mb-4">Ingrédients</h2>
+            <ul class="list-disc pl-5">
+              <li>200g de farine</li>
+              <li>100g de sucre</li>
+              <li>3 œufs</li>
+              <!-- ... (autres ingrédients) ... -->
+            </ul>
+          </div>
+
+          <!-- Steps -->
+          <div class="p-4 border-t">
+            <h2 class="text-2xl font-bold mb-4">Étapes</h2>
+            <ol class="list-decimal pl-5">
+              <li>Préchauffez le four à 180°C.</li>
+              <li>Dans un saladier, mélangez la farine et le sucre.</li>
+              <li>
+                Ajoutez les œufs un à un en mélangeant bien entre chaque ajout.
+              </li>
+              <!-- ... (autres étapes) ... -->
+            </ol>
+          </div>
+
+          <!-- Comments -->
+          <div class="p-4 border-t">
+            <h2 class="text-2xl font-bold mb-4">Commentaires</h2>
+            <!-- Comment -->
+            <div class="mb-4">
+              <div class="flex items-center mb-2">
+                <img
+                  src="https://source.unsplash.com/50x50/?portrait"
+                  alt="Nom de l'utilisateur"
+                  class="w-10 h-10 rounded-full mr-2"
+                />
+                <span class="font-bold">Marie Durand</span>
+              </div>
+              <p class="text-gray-700">
+                J'ai adoré cette recette ! Merci pour le partage.
+              </p>
+            </div>
+            <!-- ... (autres commentaires) ... -->
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- ... (reste du code précédent) ... -->
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white shadow-md">
+      <div class="container mx-auto flex py-8">
+        <div class="w-full mx-auto flex flex-wrap">
+          <div class="flex w-full lg:w-1/2">
+            <div class="px-8">
+              <h3 class="font-bold">A propos</h3>
+              <p class="py-4 text-sm">
+                Découvrez les meilleures recettes de nos chefs talentueux et
+                partagez vos propres créations culinaires.
+              </p>
+            </div>
+          </div>
+          <div class="flex w-full lg:w-1/2 lg:justify-end lg:text-right">
+            <div class="px-8">
+              <h3 class="font-bold">Contact</h3>
+              <ul class="list-reset items-center text-sm">
+                <li>
+                  <a
+                    class="inline-block hover:text-red-600 hover:underline py-1"
+                    href="#"
+                  >
+                    Email: contact@recipemaster.com
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+
+
+================================================
+FILE: documents/template/resultats.html
+================================================
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RECIPE MASTER</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="//unpkg.com/alpinejs" defer></script>
+    <style>
+      body {
+        font-family: "Poppins", sans-serif;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gray-100 text-gray-800 font-sans leading-normal tracking-normal"
+  >
+    <!-- Header -->
+    <div x-data="{ open: false }" class="bg-gray-800">
+      <nav class="shadow-md">
+        <div class="container mx-auto px-4">
+          <div class="flex justify-between items-center py-4">
+            <div class="flex items-center">
+              <a
+                class="text-white font-bold text-xl flex items-center"
+                href="index.html"
+              >
+                <i class="fas fa-utensils text-yellow-500 mr-2"></i> RECIPE
+                MASTER
+              </a>
+            </div>
+            <div class="flex md:hidden">
+              <button
+                @click="open = !open"
+                type="button"
+                class="text-white hover:text-yellow-500 focus:outline-none focus:text-yellow-500"
+              >
+                <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
+                  <path
+                    x-show="!open"
+                    class="inline-flex"
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4 6H20V8H4V6ZM4 11H20V13H4V11ZM4 16H20V18H4V16Z"
+                  />
+                  <path
+                    x-show="open"
+                    class="inline-flex"
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4 6H20V8H4V6ZM4 11H20V13H4V11ZM4 16H20V18H4V16ZM6 21H18V19H6V21ZM6 3H18V1H6V3Z"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="hidden md:flex items-center space-x-4">
+              <input
+                type="text"
+                placeholder="Rechercher une recette..."
+                class="p-2 rounded-md"
+              />
+              <a
+                class="text-white hover:text-yellow-500 px-3 py-2"
+                href="recipes.html"
+                >Recettes</a
+              >
+              <a
+                class="text-white hover:text-yellow-500 px-3 py-2"
+                href="chefs.html"
+                >Chefs</a
+              >
+            </div>
+          </div>
+        </div>
+        <div x-show="open" class="md:hidden bg-gray-700">
+          <input
+            type="text"
+            placeholder="Rechercher une recette..."
+            class="p-2 w-full"
+          />
+          <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#"
+            >Recettes</a
+          >
+          <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#"
+            >Chefs</a
+          >
+        </div>
+      </nav>
+    </div>
+
+    <!-- Main -->
+    <!-- ... (reste du code précédent) ... -->
+
+    <!-- Main -->
+    <div class="container mx-auto flex flex-wrap pt-4 pb-12 text-gray-800">
+      <!-- Filters -->
+      <aside class="w-full md:w-1/4 p-3">
+        <div class="bg-yellow-500 text-white rounded-lg shadow-md p-4 mb-4">
+          <h2 class="font-bold text-lg mb-4">Catégories</h2>
+          <ul class="list-reset text-gray-100">
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Entrées</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Plats principaux</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Desserts</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Végétarien</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Vegan</a
+              >
+            </li>
+          </ul>
+        </div>
+        <div class="bg-yellow-600 text-white rounded-lg shadow-md p-4">
+          <h2 class="font-bold text-lg mb-4">Ingrédients</h2>
+          <ul class="list-reset text-gray-200">
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Poulet</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Boeuf</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Poisson</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Légumes</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Fromage</a
+              >
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="w-full md:w-3/4 p-3">
+
+          <!-- User Main Content -->
+          <!-- Main content -->
+          <div class=" p-3">
+
+            <!-- User's Recipes -->
+            <section>
+              <h2 class="text-2xl font-bold mb-4">Résultats</h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Recipe Card -->
+                <article
+                  class="bg-white rounded-lg overflow-hidden shadow-lg relative"
+                >
+                  <img
+                    src="https://source.unsplash.com/480x360/?recipe"
+                    alt="Recipe Image"
+                    class="w-full h-48 object-cover"
+                  />
+                  <div class="p-4">
+                    <h3 class="text-xl font-bold mb-2">Nom de la recette</h3>
+                    <div class="flex items-center mb-2">
+                      <span class="text-yellow-500 mr-1"
+                        ><i class="fas fa-star"></i
+                      ></span>
+                      <span>4.5</span>
+                    </div>
+                    <p class="text-gray-600">
+                      Description courte de la recette...
+                    </p>
+                    <a
+                      href="recipe.html"
+                      class="inline-block mt-4 bg-red-500 hover:bg-red-800 rounded-full px-4 py-2 text-white"
+                      >Voir la recette</a
+                    >
+                  </div>
+                </article>
+                <!-- ... (autres cartes de recettes de l'utilisateur) ... -->
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- ... (reste du code précédent) ... -->
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white shadow-md">
+      <div class="container mx-auto flex py-8">
+        <div class="w-full mx-auto flex flex-wrap">
+          <div class="flex w-full lg:w-1/2">
+            <div class="px-8">
+              <h3 class="font-bold">A propos</h3>
+              <p class="py-4 text-sm">
+                Découvrez les meilleures recettes de nos chefs talentueux et
+                partagez vos propres créations culinaires.
+              </p>
+            </div>
+          </div>
+          <div class="flex w-full lg:w-1/2 lg:justify-end lg:text-right">
+            <div class="px-8">
+              <h3 class="font-bold">Contact</h3>
+              <ul class="list-reset items-center text-sm">
+                <li>
+                  <a
+                    class="inline-block hover:text-red-600 hover:underline py-1"
+                    href="#"
+                  >
+                    Email: contact@recipemaster.com
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+
+
+================================================
+FILE: documents/template/user.html
+================================================
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RECIPE MASTER</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="//unpkg.com/alpinejs" defer></script>
+    <style>
+      body {
+        font-family: "Poppins", sans-serif;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gray-100 text-gray-800 font-sans leading-normal tracking-normal"
+  >
+    <!-- Header -->
+    <div x-data="{ open: false }" class="bg-gray-800">
+      <nav class="shadow-md">
+        <div class="container mx-auto px-4">
+          <div class="flex justify-between items-center py-4">
+            <div class="flex items-center">
+              <a
+                class="text-white font-bold text-xl flex items-center"
+                href="index.html"
+              >
+                <i class="fas fa-utensils text-yellow-500 mr-2"></i> RECIPE
+                MASTER
+              </a>
+            </div>
+            <div class="flex md:hidden">
+              <button
+                @click="open = !open"
+                type="button"
+                class="text-white hover:text-yellow-500 focus:outline-none focus:text-yellow-500"
+              >
+                <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24">
+                  <path
+                    x-show="!open"
+                    class="inline-flex"
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4 6H20V8H4V6ZM4 11H20V13H4V11ZM4 16H20V18H4V16Z"
+                  />
+                  <path
+                    x-show="open"
+                    class="inline-flex"
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4 6H20V8H4V6ZM4 11H20V13H4V11ZM4 16H20V18H4V16ZM6 21H18V19H6V21ZM6 3H18V1H6V3Z"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="hidden md:flex items-center space-x-4">
+              <input
+                type="text"
+                placeholder="Rechercher une recette..."
+                class="p-2 rounded-md"
+              />
+              <a
+                class="text-white hover:text-yellow-500 px-3 py-2"
+                href="recipes.html"
+                >Recettes</a
+              >
+              <a
+                class="text-white hover:text-yellow-500 px-3 py-2"
+                href="chefs.html"
+                >Chefs</a
+              >
+            </div>
+          </div>
+        </div>
+        <div x-show="open" class="md:hidden bg-gray-700">
+          <input
+            type="text"
+            placeholder="Rechercher une recette..."
+            class="p-2 w-full"
+          />
+          <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#"
+            >Recettes</a
+          >
+          <a class="block text-white hover:text-yellow-500 px-3 py-2" href="#"
+            >Chefs</a
+          >
+        </div>
+      </nav>
+    </div>
+
+    <!-- Main -->
+    <!-- ... (reste du code précédent) ... -->
+
+    <!-- Main -->
+    <div class="container mx-auto flex flex-wrap pt-4 pb-12 text-gray-800">
+      <!-- Filters -->
+      <aside class="w-full md:w-1/4 p-3">
+        <div class="bg-yellow-500 text-white rounded-lg shadow-md p-4 mb-4">
+          <h2 class="font-bold text-lg mb-4">Catégories</h2>
+          <ul class="list-reset text-gray-100">
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Entrées</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Plats principaux</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Desserts</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Végétarien</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-600 px-2 block"
+                href="#"
+                >Vegan</a
+              >
+            </li>
+          </ul>
+        </div>
+        <div class="bg-yellow-600 text-white rounded-lg shadow-md p-4">
+          <h2 class="font-bold text-lg mb-4">Ingrédients</h2>
+          <ul class="list-reset text-gray-200">
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Poulet</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Boeuf</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Poisson</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Légumes</a
+              >
+            </li>
+            <li>
+              <a
+                class="hover:text-white hover:bg-yellow-700 px-2 block"
+                href="#"
+                >Fromage</a
+              >
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="w-full md:w-3/4 p-3">
+
+          <!-- User Main Content -->
+          <!-- Main content -->
+          <div class=" p-3">
+            <!-- Hero User Profile -->
+            <section class="relative mb-6">
+              <img
+                class="w-full h-96 object-cover"
+                src="https://source.unsplash.com/1600x900/?portrait"
+                alt="User Profile Image"
+              />
+              <div
+                class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-gray-900 to-transparent"
+              >
+                <h1 class="text-3xl font-bold mb-2 text-white">
+                  Nom de l'utilisateur
+                </h1>
+                <p class="text-gray-300 mb-4">
+                  Description ou bio de l'utilisateur...
+                </p>
+              </div>
+            </section>
+
+            <!-- User's Recipes -->
+            <section>
+              <h2 class="text-2xl font-bold mb-4">Mes recettes</h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Recipe Card -->
+                <article
+                  class="bg-white rounded-lg overflow-hidden shadow-lg relative"
+                >
+                  <img
+                    src="https://source.unsplash.com/480x360/?recipe"
+                    alt="Recipe Image"
+                    class="w-full h-48 object-cover"
+                  />
+                  <div class="p-4">
+                    <h3 class="text-xl font-bold mb-2">Nom de la recette</h3>
+                    <div class="flex items-center mb-2">
+                      <span class="text-yellow-500 mr-1"
+                        ><i class="fas fa-star"></i
+                      ></span>
+                      <span>4.5</span>
+                    </div>
+                    <p class="text-gray-600">
+                      Description courte de la recette...
+                    </p>
+                    <a
+                      href="recipe.html"
+                      class="inline-block mt-4 bg-red-500 hover:bg-red-800 rounded-full px-4 py-2 text-white"
+                      >Voir la recette</a
+                    >
+                  </div>
+                </article>
+                <!-- ... (autres cartes de recettes de l'utilisateur) ... -->
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- ... (reste du code précédent) ... -->
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white shadow-md">
+      <div class="container mx-auto flex py-8">
+        <div class="w-full mx-auto flex flex-wrap">
+          <div class="flex w-full lg:w-1/2">
+            <div class="px-8">
+              <h3 class="font-bold">A propos</h3>
+              <p class="py-4 text-sm">
+                Découvrez les meilleures recettes de nos chefs talentueux et
+                partagez vos propres créations culinaires.
+              </p>
+            </div>
+          </div>
+          <div class="flex w-full lg:w-1/2 lg:justify-end lg:text-right">
+            <div class="px-8">
+              <h3 class="font-bold">Contact</h3>
+              <ul class="list-reset items-center text-sm">
+                <li>
+                  <a
+                    class="inline-block hover:text-red-600 hover:underline py-1"
+                    href="#"
+                  >
+                    Email: contact@recipemaster.com
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+
+
+================================================
+FILE: public/index.php
+================================================
+<?php
+
+require_once '../core/init.php';
+require_once '../app/routers/index.php';
+require_once '../app/views/templates/default.php';
+
+
