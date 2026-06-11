@@ -9,7 +9,7 @@
             <a
                 class="hover:text-white hover:bg-yellow-700 px-2 block"
                 href="?ingredients=show&id=<?php echo $ingredient['id']; ?>">
-                <?php echo $ingredient['name']; ?>
+                <?php echo $ingredient['name']; ?> (<?php echo $ingredient['recipes_count']; ?>)
             </a>
         </li>
     <?php endforeach; ?>

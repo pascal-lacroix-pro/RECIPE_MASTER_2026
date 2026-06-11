@@ -6,9 +6,11 @@ use \PDO;
 
 function findAll(PDO $conn)
 {
-    $sql = "SELECT *
+    $sql = "SELECT ingredients.*, COUNT(rhi.recipe_id) AS recipes_count
             FROM ingredients
-            ORDER BY name ASC;";
+            LEFT JOIN recipes_has_ingredients rhi ON ingredients.id = rhi.ingredient_id
+            GROUP BY ingredients.id
+            ORDER BY ingredients.name ASC;";
     $rs = $conn->query($sql);
     return $rs->fetchAll(PDO::FETCH_ASSOC);
 }
