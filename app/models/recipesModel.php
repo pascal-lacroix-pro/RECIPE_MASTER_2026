@@ -16,9 +16,11 @@ function findOneByRand(PDO $conn): array
 
 function findAll(PDO $conn, int $limit = 9)
 {
-    $sql = "SELECT *
+    $sql = "SELECT recipes.*, COUNT(c.id) AS comments_count
             FROM recipes
-            ORDER BY created_at DESC
+            LEFT JOIN comments c ON recipes.id = c.recipe_id
+            GROUP BY recipes.id
+            ORDER BY recipes.created_at DESC
             LIMIT :limit;";
     $rs = $conn->prepare($sql);
     $rs->bindValue(":limit", $limit, PDO::PARAM_INT);
@@ -28,9 +30,11 @@ function findAll(PDO $conn, int $limit = 9)
 
 function findAllPopulars(PDO $conn)
 {
-    $sql = "SELECT *
+    $sql = "SELECT recipes.*, COUNT(c.id) AS comments_count
             FROM recipes
-            ORDER BY created_at DESC
+            LEFT JOIN comments c ON recipes.id = c.recipe_id
+            GROUP BY recipes.id
+            ORDER BY recipes.created_at DESC
             LIMIT 3;";
     $rs = $conn->query($sql);
     return $rs->fetchAll(PDO::FETCH_ASSOC);
@@ -38,10 +42,12 @@ function findAllPopulars(PDO $conn)
 
 function findAllByUserId(PDO $conn, int $userID)
 {
-    $sql = "SELECT *
+    $sql = "SELECT recipes.*, COUNT(c.id) AS comments_count
             FROM recipes
-            WHERE user_id = :userID
-            ORDER BY created_at DESC
+            LEFT JOIN comments c ON recipes.id = c.recipe_id
+            WHERE recipes.user_id = :userID
+            GROUP BY recipes.id
+            ORDER BY recipes.created_at DESC
             LIMIT 3;";
     $rs = $conn->prepare($sql);
     $rs->bindValue(':userID', $userID, PDO::PARAM_INT);
@@ -51,10 +57,12 @@ function findAllByUserId(PDO $conn, int $userID)
 
 function findAllByTypeId(PDO $conn, int $typeId)
 {
-    $sql = "SELECT *
+    $sql = "SELECT recipes.*, COUNT(c.id) AS comments_count
             FROM recipes
-            WHERE type_id = :typeId
-            ORDER BY created_at DESC;";
+            LEFT JOIN comments c ON recipes.id = c.recipe_id
+            WHERE recipes.type_id = :typeId
+            GROUP BY recipes.id
+            ORDER BY recipes.created_at DESC;";
     $rs = $conn->prepare($sql);
     $rs->bindValue(':typeId', $typeId, PDO::PARAM_INT);
     $rs->execute();
@@ -63,10 +71,12 @@ function findAllByTypeId(PDO $conn, int $typeId)
 
 function findAllByIngredientId(PDO $conn, int $ingredientId)
 {
-    $sql = "SELECT recipes.*
+    $sql = "SELECT recipes.*, COUNT(c.id) AS comments_count
             FROM recipes
-            JOIN recipes_has_ingredients ON recipes.id = recipes_has_ingredients.recipe_id
-            WHERE recipes_has_ingredients.ingredient_id = :ingredientId
+            LEFT JOIN comments c ON recipes.id = c.recipe_id
+            JOIN recipes_has_ingredients rhi ON recipes.id = rhi.recipe_id
+            WHERE rhi.ingredient_id = :ingredientId
+            GROUP BY recipes.id
             ORDER BY recipes.created_at DESC;";
     $rs = $conn->prepare($sql);
     $rs->bindValue(':ingredientId', $ingredientId, PDO::PARAM_INT);
@@ -76,11 +86,13 @@ function findAllByIngredientId(PDO $conn, int $ingredientId)
 
 function search(PDO $conn, string $query)
 {
-    $sql = "SELECT *
+    $sql = "SELECT recipes.*, COUNT(c.id) AS comments_count
             FROM recipes
-            WHERE name LIKE :query
-               OR description LIKE :query
-            ORDER BY created_at DESC;";
+            LEFT JOIN comments c ON recipes.id = c.recipe_id
+            WHERE recipes.name LIKE :query
+               OR recipes.description LIKE :query
+            GROUP BY recipes.id
+            ORDER BY recipes.created_at DESC;";
     $rs = $conn->prepare($sql);
     $rs->bindValue(':query', '%' . $query . '%', PDO::PARAM_STR);
     $rs->execute();

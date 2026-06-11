@@ -21,7 +21,7 @@
                 <p class="text-gray-600"><?php echo \Core\Helpers\truncate($recipe['description'], 50); ?></p>
                 <div class="flex items-center mt-4">
                     <span class="text-gray-700 mr-2">Par <?php echo $recipe['user_id']; ?></span>
-                    <span class="text-gray-500"><i class="fas fa-comment"></i> 8 commentaires</span>
+                    <span class="text-gray-500"><i class="fas fa-comment"></i> <?php echo $recipe['comments_count']; ?> commentaires</span>
                 </div>
                 <a
                     href="?recipes=show&id=<?php echo $recipe['id']; ?>"
